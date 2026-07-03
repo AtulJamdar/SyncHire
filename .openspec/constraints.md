@@ -1,0 +1,4 @@
+# .openspec: constraints
+
+Constraints placeholder.
+
