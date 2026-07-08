@@ -69,48 +69,48 @@ Tasks are not vague reminders. Each task is specific enough that any engineer ca
 
 ### Docker & Local Dev
 
-- [ ] Create `docker-compose.yml` with services: postgres, redis, backend, scheduler, frontend
+- [✔️] Create `docker-compose.yml` with services: postgres, redis, backend, scheduler, frontend
   - **Backend:** `uvicorn main:app --reload`
   - **Frontend:** `npm run dev`
   - **Both:** volume-mounted source for hot reload
   - **Ref:** `14_DEPLOYMENT.md` Section 3.2
 
-- [ ] Write `backend/Dockerfile` (slim Python 3.12, Playwright deps, Gunicorn CMD)
+- [✔️] Write `backend/Dockerfile` (slim Python 3.12, Playwright deps, Gunicorn CMD)
   - **Ref:** `14_DEPLOYMENT.md` Section 3.3
 
-- [ ] Write `frontend/Dockerfile` (multi-stage: dev / builder / production)
+- [✔️] Write `frontend/Dockerfile` (multi-stage: dev / builder / production)
   - **Ref:** `14_DEPLOYMENT.md` Section 3.4
 
-- [ ] Write `.dockerignore` for both backend and frontend
+- [✔️] Write `.dockerignore` for both backend and frontend
   - **Ref:** `14_DEPLOYMENT.md` Section 3.5
 
-- [ ] Write `.env.example` with all required variables and generation instructions
+- [✔️] Write `.env.example` with all required variables and generation instructions
   - **Ref:** `14_DEPLOYMENT.md` Section 4.2
 
-- [ ] Verify `docker compose up` starts all 5 services cleanly on a fresh clone
+- [✔️] Verify `docker compose up` starts all 5 services cleanly on a fresh clone
   - Frontend accessible at `http://localhost:3000`
   - Backend accessible at `http://localhost:8000`
   - FastAPI docs at `http://localhost:8000/docs`
 
 ### Backend Foundation
 
-- [ ] Create FastAPI app in `backend/main.py`
+- [✔️] Create FastAPI app in `backend/main.py`
   - Register all routers
   - Register all middleware (CORS, security headers, rate limit, trace ID)
   - Register startup event (`wait_for_db`)
   - **Ref:** `05_ARCHITECTURE.md` Section 2, `13_SECURITY.md` Section 6.3
 
-- [ ] Create `backend/config.py` using Pydantic `BaseSettings`
+- [✔️] Create `backend/config.py` using Pydantic `BaseSettings`
   - Load all env variables
   - Validate required vars on startup (fail fast if missing)
 
-- [ ] Create `backend/core/database.py`
+- [✔️] Create `backend/core/database.py`
   - SQLAlchemy async engine
   - Session factory
   - `wait_for_db()` with retry loop
   - **Ref:** `14_DEPLOYMENT.md` Section 7
 
-- [ ] Create `backend/core/redis_client.py`
+- [✔️] Create `backend/core/redis_client.py`
   - Async Redis connection pool
   - Health check function
 
