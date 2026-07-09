@@ -195,6 +195,7 @@ Every entry answers five questions:
 | `jobs.py` | Job listing feed, job detail |
 | `saved_jobs.py` | Save, unsave, list, update status, stats |
 | `notifications.py` | Notification preferences, history |
+| `health.py` | Uptime monitor liveness and readiness check (database and Redis connectivity) |
 | `admin/companies.py` | Company CRUD, ATS detection, manual scrape trigger |
 | `admin/scraper_health.py` | Scraper health aggregate |
 | `admin/review_queue.py` | Flagged job approve/reject |
@@ -564,6 +565,7 @@ class XyzAdapter(BaseScraper):
 | File | Does |
 |---|---|
 | `next.config.ts` | Next.js configuration: `output: "standalone"` for Docker, `images.domains` for company logos, environment variable exposure |
+| `types/index.ts` | Standard TypeScript interfaces and response schemas mirroring Pydantic models |
 | `tailwind.config.ts` | Design token configuration: color palette, spacing scale, font settings |
 | `middleware.ts` | Route protection: redirects unauthenticated users from protected routes to `/login`; redirects authenticated users away from auth pages |
 | `tsconfig.json` | TypeScript configuration with strict mode and path aliases (`@/` → `src/`) |

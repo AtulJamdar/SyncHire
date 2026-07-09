@@ -114,41 +114,41 @@ Tasks are not vague reminders. Each task is specific enough that any engineer ca
   - Async Redis connection pool
   - Health check function
 
-- [ ] Create `backend/core/logging.py`
+- [✔️] Create `backend/core/logging.py`
   - JSON formatter
   - Trace ID context var
   - Sensitive field redaction filter
   - **Ref:** `14_DEPLOYMENT.md` Section 9, `13_SECURITY.md` Section 11.4
 
-- [ ] Create `/health` endpoint
+- [✔️] Create `/health` endpoint
   - Checks DB connectivity + Redis connectivity
   - Returns `200 ok` or `503 degraded` with JSON body
   - **Ref:** `14_DEPLOYMENT.md` Section 8.1
 
 ### Frontend Foundation
 
-- [ ] Initialize Next.js app with App Router, TypeScript, Tailwind
+- [✔️] Initialize Next.js app with App Router, TypeScript, Tailwind
   - `npx create-next-app@latest --typescript --tailwind --app`
 
-- [ ] Install and configure shadcn/ui
+- [✔️] Install and configure shadcn/ui
   - Copy in all required primitive components: Button, Badge, Card, Dialog, Input, Select, Tabs, Skeleton, Sheet, Toast, Label, DropdownMenu
   - **Ref:** `12_FRONTEND.md` Section 2
 
-- [ ] Set up CSS design tokens in `globals.css`
+- [✔️] Set up CSS design tokens in `globals.css`
   - All color variables for light + dark mode
   - **Ref:** `12_FRONTEND.md` Section 9
 
-- [ ] Create `frontend/types/index.ts` with all TypeScript types
+- [✔️] Create `frontend/types/index.ts` with all TypeScript types
   - **Ref:** `12_FRONTEND.md` Section 14
 
-- [ ] Create `frontend/lib/api.ts`
+- [✔️] Create `frontend/lib/api.ts`
   - Axios instance with base URL
   - Request interceptor (attach access token)
   - Response interceptor (401 → refresh → retry)
   - All domain-grouped API functions
   - **Ref:** `12_FRONTEND.md` Section 7
 
-- [ ] Create `frontend/lib/utils.ts`
+- [✔️] Create `frontend/lib/utils.ts`
   - `cn()` (clsx + tailwind-merge)
   - `formatPostedAt()` (relative time from ISO string)
   - `formatDate()` (readable date)

@@ -71,6 +71,24 @@ Changes that are documented or planned but not yet deployed to production.
 ### Added
 - Full documentation suite (docs/00 through docs/22, AI_RULES.md, .openspec/)
 - Initial project structure scaffolding
+- Created `backend/core/logging.py` containing a structured JSON log formatter, sensitive field redaction filter, and request trace correlation ID.
+- Created `/health` endpoint checking both database and Redis connectivity.
+- Initialized Next.js App Router frontend application with TypeScript, Tailwind CSS, and ESLint configs.
+- Integrated `shadcn/ui` (using `@base-ui/react` v4 presets) into the Next.js frontend application.
+- Added and configured required primitive UI components: Button, Badge, Card, Dialog, Input, Select, Tabs, Skeleton, Sheet, Label, and DropdownMenu.
+- Created custom offline-capable `Toast`, `Toaster` and `useToast` notification helper hook supporting variants, descriptions, and auto-dismissal.
+- Configured HSL color design tokens and custom theme properties in `frontend/app/globals.css` for light and dark modes.
+- Created `frontend/types/index.ts` with standard TypeScript interfaces mirroring backend schemas.
+- Created `frontend/lib/auth.ts` implementing XSS-secure in-memory token storage.
+- Created `frontend/lib/api.ts` exposing domain-grouped API functions with auto-refresh JWT interceptors.
+- Implemented core utility helpers in `frontend/lib/utils.ts` for relative timestamp formatting (`formatPostedAt`), absolute date formatting (`formatDate`), accessibility animation gating (`getMotionPreference`), and active query filter identification (`hasActiveFilters`).
+
+### Changed
+- Configured FastAPI application startup in `backend/main.py` to initialize JSON logging via `setup_logging()`.
+- Refactored `backend/middleware/logging_middleware.py` to route trace ID context lifecycle through the new `core.logging` module.
+- Added `pydantic-settings` to `backend/requirements.txt` to enable structured configuration parsing.
+- Registered `health` router on the FastAPI application in `backend/main.py` and removed the temporary mock health handler.
+- Configured standalone build output (`output: "standalone"`) in `next.config.ts` for optimized production Docker images.
 
 ---
 

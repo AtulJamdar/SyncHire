@@ -2,12 +2,16 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from config import settings
 from core.database import wait_for_db
+from core.logging import setup_logging
 from middleware.security_headers import security_headers_middleware
 from middleware.logging_middleware import logging_middleware
 from middleware.rate_limit_middleware import rate_limit_middleware
 
+# Initialize structured logging before other services start
+setup_logging()
+
 # Import routers
-from api import auth, profile, jobs, saved_jobs, notifications
+from api import auth, profile, jobs, saved_jobs, notifications, health
 from api.admin import companies, scraper_health, review_queue, users
 from api.webhooks import telegram
 
@@ -55,9 +59,7 @@ async def startup_event():
 
 
 # Base / Health endpoints
-@app.get("/health", tags=["Health"])
-async def health_check():
-    return {"status": "healthy"}
+app.include_router(health.router)
 
 
 # Register all API routers
