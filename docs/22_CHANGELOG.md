@@ -82,9 +82,38 @@ Changes that are documented or planned but not yet deployed to production.
 - Created `frontend/lib/auth.ts` implementing XSS-secure in-memory token storage.
 - Created `frontend/lib/api.ts` exposing domain-grouped API functions with auto-refresh JWT interceptors.
 - Implemented core utility helpers in `frontend/lib/utils.ts` for relative timestamp formatting (`formatPostedAt`), absolute date formatting (`formatDate`), accessibility animation gating (`getMotionPreference`), and active query filter identification (`hasActiveFilters`).
+- Created `frontend/middleware.ts` for global Next.js route protection, managing auth state redirects and handling unauthenticated routes transparently.
+- Initialized Alembic database migration environment in the backend and configured script location to `database/migrations/`.
+- Created the declarative SQLAlchemy `User` model in `backend/models/user.py` representing the core identity table.
+- Created the Alembic migration script for the `users` table, including custom `user_role` PostgreSQL enum type and partial unique indexes.
+- Created the declarative SQLAlchemy `RefreshToken` model in `backend/models/token.py` and established a back-populating relationship on `User`.
+- Created the Alembic migration script for the `refresh_tokens` table, establishing foreign key cascading delete constraints and indexes on `user_id` and `expires_at`.
+- Created the declarative SQLAlchemy `EmailVerificationToken` model in `backend/models/token.py` and established a back-populating relationship on `User`.
+- Created the Alembic migration script for the `email_verification_tokens` table, establishing foreign key constraints and a unique index on the verification token.
+- Created the declarative SQLAlchemy `PasswordResetToken` model in `backend/models/token.py` and established a back-populating relationship on `User`.
+- Created the Alembic migration script for the `password_reset_tokens` table, establishing foreign key constraints and an index on `user_id`.
+- Created the declarative SQLAlchemy `AuditLog` model in `backend/models/audit_log.py` and established a back-populating relationship on `User`.
+- Created the Alembic migration script for the `audit_logs` table, establishing INET/JSONB fields, foreign key constraints with `SET NULL` on delete, and performance indexes including a descending index on `created_at`.
+- Implemented `backend/core/security.py` covering bcrypt password hashing (cost=12), timing-safe verify, HS256 JWT access tokens with 15-minute expiration, 64-byte secure refresh tokens, and HttpOnly/SameSite session cookies scoped to `/api/auth`.
+- Implemented `backend/middleware/auth_middleware.py` exposing `get_current_user` and `require_admin` FastAPI dependencies for backend route auth and role gating.
+- Implemented `POST /api/auth/register` in `backend/api/auth.py` validating registration requests, checking for database email conflicts, hashing credentials, generating verification tokens, and dispatching verification emails.
+- Added global exception handlers in `backend/main.py` converting Pydantic validation errors (422) into standard 400 validation error payloads.
+- Created `backend/schemas/auth_schemas.py` defining registration validation schema matching security policies.
+- Added the Daniel Miessler SecLists top 10,000 common passwords file under `backend/data/common_passwords.txt`.
+- Created provider-agnostic wrapper `notifications/email/client.py` using the Resend service.
+- Added `resend` package to `backend/requirements.txt`.
+- Implemented `POST /api/auth/resend-verification` endpoint in `backend/api/auth.py` with Redis-based email rate limiting (3 requests/hour/email) and email enumeration protection.
+- Created the `ResendVerificationRequest` validation schema in `backend/schemas/auth_schemas.py`.
+- Implemented Google OAuth initiation (`GET /api/auth/oauth/google`) and callback verification (`GET /api/auth/oauth/google/callback`) routes in `backend/api/auth.py` with Redis-based CSRF state verification and auto-linking/creation of active user profiles.
+- Added `httpx` package to `backend/requirements.txt`.
+- Implemented `POST /api/auth/login` endpoint in `backend/api/auth.py` verifying credentials safely, enforcing timing-safe dummy validations for nonexistent profiles, tracking 15-minute email-based locks (10 failures max) via Redis, and delivering JWT tokens and secure HttpOnly refresh cookies.
+- Added `LoginRequest` validation schema in `backend/schemas/auth_schemas.py`.
+- Implemented `POST /api/auth/refresh` endpoint in `backend/api/auth.py` enabling refresh token rotation, tracking token reuse/replay attacks via the `revoked_at` column, revoking all active user sessions upon breach, and returning rotated credentials.
+- Implemented `POST /api/auth/logout` endpoint in `backend/api/auth.py` protected by the `get_current_user` dependency, revoking the session refresh token from the database, and erasing the client browser cookie.
 
 ### Changed
 - Configured FastAPI application startup in `backend/main.py` to initialize JSON logging via `setup_logging()`.
+- Refactored `backend/models/audit_log.py`'s `metadata` attribute to `event_metadata` mapped to the database column `"metadata"` to prevent SQLAlchemy reserved keyword conflicts.
 - Refactored `backend/middleware/logging_middleware.py` to route trace ID context lifecycle through the new `core.logging` module.
 - Added `pydantic-settings` to `backend/requirements.txt` to enable structured configuration parsing.
 - Registered `health` router on the FastAPI application in `backend/main.py` and removed the temporary mock health handler.

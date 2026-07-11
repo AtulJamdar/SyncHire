@@ -176,6 +176,12 @@ Every entry answers five questions:
 
 **Common modifications:** When adding a new environment variable, add it here first, then to `.env.example`. Never read `os.environ` directly in application code — always use `settings.VARIABLE_NAME`.
 
+### `backend/alembic.ini`
+
+**Why it exists:** Alembic database migrations configuration.
+
+**What it does:** Configures the database connection URL loader, script location (pointing to `../database/migrations`), and logging levels for database migrations.
+
 ---
 
 ## 5. backend/api/

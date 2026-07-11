@@ -153,7 +153,7 @@ Tasks are not vague reminders. Each task is specific enough that any engineer ca
   - `formatPostedAt()` (relative time from ISO string)
   - `formatDate()` (readable date)
 
-- [ ] Configure `middleware.ts` for route protection
+- [✔️] Configure `middleware.ts` for route protection
   - Public paths: login, register, verify-email, unsubscribe
   - All others require `refresh_token` cookie presence
   - Admin paths: additional role check in page-level server component
@@ -165,23 +165,23 @@ Tasks are not vague reminders. Each task is specific enough that any engineer ca
 
 ### Backend
 
-- [ ] Create `users` table migration (Alembic)
+- [✔️] Create `users` table migration (Alembic)
   - All columns from `07_DATABASE.md` Section 2
   - All indexes
 
-- [ ] Create `refresh_tokens` table migration
+- [✔️] Create `refresh_tokens` table migration
   - **Ref:** `07_DATABASE.md` Section 3
 
-- [ ] Create `email_verification_tokens` table migration
+- [✔️] Create `email_verification_tokens` table migration
   - **Ref:** `07_DATABASE.md` Section 4
 
-- [ ] Create `password_reset_tokens` table migration
+- [✔️] Create `password_reset_tokens` table migration
   - **Ref:** `07_DATABASE.md` Section 5
 
-- [ ] Create `audit_logs` table migration
+- [✔️] Create `audit_logs` table migration
   - **Ref:** `07_DATABASE.md` (referenced from `13_SECURITY.md` Section 14.2)
 
-- [ ] Implement `backend/core/security.py`
+- [✔️] Implement `backend/core/security.py`
   - `hash_password()` — bcrypt, cost 12
   - `verify_password()` — timing-safe
   - `create_access_token()` — HS256, 15-min TTL, `type: "access"` claim
@@ -190,46 +190,46 @@ Tasks are not vague reminders. Each task is specific enough that any engineer ca
   - `set_refresh_cookie()` — httpOnly, Secure, SameSite=Strict, `/api/auth` path
   - **Ref:** `13_SECURITY.md` Sections 2, 4
 
-- [ ] Implement `backend/middleware/auth_middleware.py`
+- [✔️] Implement `backend/middleware/auth_middleware.py`
   - `get_current_user()` FastAPI dependency
   - `require_admin()` FastAPI dependency
   - **Ref:** `13_SECURITY.md` Section 3.2
 
-- [ ] Implement `POST /api/auth/register`
+- [✔️] Implement `POST /api/auth/register`
   - Validate name, email, password (strength + common password check)
   - Check for existing email → 409
   - Hash password, create user (is_verified=false)
   - Generate verification token, send email
   - **Ref:** `08_API.md`, `13_SECURITY.md` Section 2.2
 
-- [ ] Implement `GET /api/auth/verify-email?token={uuid}`
+- [✔️] Implement `GET /api/auth/verify-email?token={uuid}`
   - Validate token (exists, not expired, not used)
   - Set `is_verified=true`, delete token
   - Return 200 or 410 (expired)
   - **Ref:** `08_API.md`
 
-- [ ] Implement `POST /api/auth/resend-verification`
+- [✔️] Implement `POST /api/auth/resend-verification`
   - Rate limit: 3 req/hour/email
   - Same 200 response whether email exists or not
   - **Ref:** `08_API.md`
 
-- [ ] Implement `GET /api/auth/oauth/google` + `GET /api/auth/oauth/google/callback`
+- [✔️] Implement `GET /api/auth/oauth/google` + `GET /api/auth/oauth/google/callback`
   - State parameter for CSRF
   - Create or link account on callback
   - **Ref:** `08_API.md`, `13_SECURITY.md` Section 2.3
 
-- [ ] Implement `POST /api/auth/login`
+- [✔️] Implement `POST /api/auth/login`
   - Rate limit: 5 req/min/IP
   - Login lockout after 10 consecutive failures (per email, 15-min lock)
   - Issue access token + set refresh cookie
   - **Ref:** `08_API.md`, `13_SECURITY.md` Section 8.3
 
-- [ ] Implement `POST /api/auth/refresh`
+- [✔️] Implement `POST /api/auth/refresh`
   - Read cookie, validate hash, rotate token, return new access token
   - Reuse detection → revoke all sessions
   - **Ref:** `08_API.md`, `13_SECURITY.md` Section 4.3
 
-- [ ] Implement `POST /api/auth/logout`
+- [✔️] Implement `POST /api/auth/logout`
   - Delete refresh token from DB, clear cookie
   - **Ref:** `08_API.md`
 
