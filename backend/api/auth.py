@@ -22,8 +22,8 @@ from core.database import get_db
 from core.redis_client import redis
 from core.security import hash_password, create_refresh_token, set_refresh_cookie, create_access_token, verify_password
 from models.user import User, UserRole
-from models.token import EmailVerificationToken, RefreshToken
-from schemas.auth_schemas import RegisterRequest, ResendVerificationRequest, LoginRequest
+from models.token import EmailVerificationToken, RefreshToken, PasswordResetToken
+from schemas.auth_schemas import RegisterRequest, ResendVerificationRequest, LoginRequest, ForgotPasswordRequest
 from notifications.email.client import EmailClient
 from middleware.auth_middleware import get_current_user
 
@@ -738,6 +738,98 @@ async def logout(
     response.delete_cookie(key="refresh_token", path="/api/auth")
     
     return { "message": "Logged out successfully" }
+
+
+@router.post("/forgot-password", status_code=status.HTTP_200_OK)
+async def forgot_password(
+    body: ForgotPasswordRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    email = body.email.strip().lower()
+
+    # 1. Enforce rate limit: 3 requests / hour / email address using Redis
+    rate_limit_key = f"rl:auth_forgot:email:{email}"
+    now = time.time()
+    window_start = now - 3600
+    
+    try:
+        pipe = redis.pipeline()
+        pipe.zremrangebyscore(rate_limit_key, 0, window_start)  # Clean old requests
+        pipe.zadd(rate_limit_key, {str(now): now})              # Add current request timestamp
+        pipe.zcard(rate_limit_key)                              # Count total requests in window
+        pipe.expire(rate_limit_key, 3601)                       # Expire key after 1 hour
+        results = await pipe.execute()
+        count = results[2]
+        
+        if count > 3:
+            logger.warning(f"Forgot password rate limit exceeded for {email} ({count}/3)")
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail={
+                    "code": "TOO_MANY_REQUESTS",
+                    "message": "Too many password reset requests. Please try again later."
+                }
+            )
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        logger.error(f"Redis email rate limiting connection failed: {e}")
+
+    # Standard generic response
+    generic_response = {
+        "message": "If an account exists with this email, a reset link has been sent."
+    }
+
+    # 2. Fetch user
+    result = await db.execute(select(User).where(User.email == email))
+    user = result.scalar_one_or_none()
+
+    # User does not exist, or user is not active or user is deleted -> return 200 (no email enumeration)
+    if not user or not user.is_active or user.is_deleted:
+        return generic_response
+
+    # 3. Clean up any existing password reset tokens for this user
+    await db.execute(
+        delete(PasswordResetToken).where(PasswordResetToken.user_id == user.id)
+    )
+
+    # 4. Generate new reset token
+    raw_token = str(uuid.uuid4())
+    token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+    
+    token_record = PasswordResetToken(
+        user_id=user.id,
+        token_hash=token_hash,
+        expires_at=datetime.now(timezone.utc) + timedelta(hours=1)
+    )
+    db.add(token_record)
+    await db.commit()
+
+    # 5. Send password reset email
+    reset_url = f"{settings.NEXTAUTH_URL}/reset-password?token={raw_token}"
+    subject = "Reset your password"
+    html_body = f"""
+    <p>Hi {user.name},</p>
+    <p>We received a request to reset your password for your Job Finder AI account. Please click the link below to reset your password:</p>
+    <p><a href="{reset_url}">{reset_url}</a></p>
+    <p>This link will expire in 1 hour.</p>
+    <p>If you did not request a password reset, you can safely ignore this email.</p>
+    """
+
+    try:
+        email_sent = await email_client.send(
+            to=user.email,
+            subject=subject,
+            html_body=html_body,
+            from_name=settings.EMAIL_FROM_NAME,
+            from_email=settings.EMAIL_FROM_ADDRESS
+        )
+        if not email_sent:
+            logger.error(f"Failed to send password reset email to {user.email}")
+    except Exception as e:
+        logger.error(f"Email service exception while sending password reset to {user.email}: {e}")
+
+    return generic_response
 
 
 

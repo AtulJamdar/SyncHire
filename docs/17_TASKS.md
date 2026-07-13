@@ -233,7 +233,7 @@ Tasks are not vague reminders. Each task is specific enough that any engineer ca
   - Delete refresh token from DB, clear cookie
   - **Ref:** `08_API.md`
 
-- [ ] Implement `POST /api/auth/forgot-password`
+- [✔️] Implement `POST /api/auth/forgot-password`
   - Rate limit: 3 req/hour/email
   - Always return 200 (no email enumeration)
   - **Ref:** `08_API.md`

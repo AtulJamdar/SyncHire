@@ -110,6 +110,9 @@ Changes that are documented or planned but not yet deployed to production.
 - Added `LoginRequest` validation schema in `backend/schemas/auth_schemas.py`.
 - Implemented `POST /api/auth/refresh` endpoint in `backend/api/auth.py` enabling refresh token rotation, tracking token reuse/replay attacks via the `revoked_at` column, revoking all active user sessions upon breach, and returning rotated credentials.
 - Implemented `POST /api/auth/logout` endpoint in `backend/api/auth.py` protected by the `get_current_user` dependency, revoking the session refresh token from the database, and erasing the client browser cookie.
+- Implemented `POST /api/auth/forgot-password` endpoint in `backend/api/auth.py` with Redis-based rate limiting (3 requests/hour/email) and prevention of email enumeration.
+- Added `ForgotPasswordRequest` validation schema in `backend/schemas/auth_schemas.py`.
+
 
 ### Changed
 - Configured FastAPI application startup in `backend/main.py` to initialize JSON logging via `setup_logging()`.
