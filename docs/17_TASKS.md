@@ -238,7 +238,7 @@ Tasks are not vague reminders. Each task is specific enough that any engineer ca
   - Always return 200 (no email enumeration)
   - **Ref:** `08_API.md`
 
-- [ ] Implement `POST /api/auth/reset-password`
+- [✔️] Implement `POST /api/auth/reset-password`
   - Validate token, update hash, revoke all refresh tokens
   - **Ref:** `08_API.md`
 

@@ -112,6 +112,9 @@ Changes that are documented or planned but not yet deployed to production.
 - Implemented `POST /api/auth/logout` endpoint in `backend/api/auth.py` protected by the `get_current_user` dependency, revoking the session refresh token from the database, and erasing the client browser cookie.
 - Implemented `POST /api/auth/forgot-password` endpoint in `backend/api/auth.py` with Redis-based rate limiting (3 requests/hour/email) and prevention of email enumeration.
 - Added `ForgotPasswordRequest` validation schema in `backend/schemas/auth_schemas.py`.
+- Implemented `POST /api/auth/reset-password` endpoint in `backend/api/auth.py` validating token existence/expiry, resetting active user password hash, setting verified status, and revoking all active sessions.
+- Added `ResetPasswordRequest` validation schema in `backend/schemas/auth_schemas.py`.
+
 
 
 ### Changed

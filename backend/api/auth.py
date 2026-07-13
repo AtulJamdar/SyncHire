@@ -23,7 +23,7 @@ from core.redis_client import redis
 from core.security import hash_password, create_refresh_token, set_refresh_cookie, create_access_token, verify_password
 from models.user import User, UserRole
 from models.token import EmailVerificationToken, RefreshToken, PasswordResetToken
-from schemas.auth_schemas import RegisterRequest, ResendVerificationRequest, LoginRequest, ForgotPasswordRequest
+from schemas.auth_schemas import RegisterRequest, ResendVerificationRequest, LoginRequest, ForgotPasswordRequest, ResetPasswordRequest
 from notifications.email.client import EmailClient
 from middleware.auth_middleware import get_current_user
 
@@ -830,6 +830,77 @@ async def forgot_password(
         logger.error(f"Email service exception while sending password reset to {user.email}: {e}")
 
     return generic_response
+
+
+@router.post("/reset-password", status_code=status.HTTP_200_OK)
+async def reset_password(
+    body: ResetPasswordRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    # 1. Compute SHA-256 hash of the token
+    token_hash = hashlib.sha256(str(body.token).encode()).hexdigest()
+
+    # 2. Query PasswordResetToken record
+    result = await db.execute(
+        select(PasswordResetToken).where(PasswordResetToken.token_hash == token_hash)
+    )
+    record = result.scalar_one_or_none()
+
+    if not record or record.used_at is not None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "code": "INVALID_TOKEN",
+                "message": "Reset token is invalid or has already been used"
+            }
+        )
+
+    # 3. Check expiration (token older than 1 hour)
+    now = datetime.now(timezone.utc)
+    expires_at = record.expires_at
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+
+    if expires_at < now:
+        await db.delete(record)
+        await db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_410_GONE,
+            detail={
+                "code": "TOKEN_EXPIRED",
+                "message": "Reset token has expired. Please request a new one."
+            }
+        )
+
+    # 4. Fetch user
+    user_result = await db.execute(select(User).where(User.id == record.user_id))
+    user = user_result.scalar_one_or_none()
+
+    if not user or not user.is_active or user.is_deleted:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "code": "INVALID_TOKEN",
+                "message": "User associated with this token is invalid or suspended"
+            }
+        )
+
+    # 5. Update user password hash, set verified = True
+    user.password_hash = hash_password(body.new_password)
+    user.is_verified = True
+
+    # 6. Revoke all refresh tokens for the user (forces re-login on all devices)
+    await db.execute(
+        delete(RefreshToken).where(RefreshToken.user_id == user.id)
+    )
+
+    # 7. Delete/Clean up the reset token
+    await db.delete(record)
+    await db.commit()
+
+    return {
+        "message": "Password reset successfully. Please log in with your new password."
+    }
 
 
 
