@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime, timezone
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -36,11 +37,24 @@ async def get_current_user(
     result = await db.execute(select(User).where(User.id == user_uuid))
     user = result.scalar_one_or_none()
     
-    if not user or not user.is_active or user.is_deleted:
+    if not user or not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired token"
         )
+        
+    if user.is_deleted:
+        # Check if the user is within the 30-day grace period
+        now = datetime.now(timezone.utc)
+        deleted_at = user.deleted_at
+        if deleted_at and deleted_at.tzinfo is None:
+            deleted_at = deleted_at.replace(tzinfo=timezone.utc)
+            
+        if not deleted_at or (now - deleted_at).days >= 30:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid or expired token"
+            )
         
     return user
 

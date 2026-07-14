@@ -65,4 +65,9 @@ class ResetPasswordRequest(BaseModel):
         return validate_password_complexity(v)
 
 
+class DeleteAccountRequest(BaseModel):
+    confirm_email: EmailStr = Field(..., max_length=255)
+
+
+
 

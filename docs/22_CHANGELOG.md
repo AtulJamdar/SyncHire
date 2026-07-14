@@ -114,6 +114,11 @@ Changes that are documented or planned but not yet deployed to production.
 - Added `ForgotPasswordRequest` validation schema in `backend/schemas/auth_schemas.py`.
 - Implemented `POST /api/auth/reset-password` endpoint in `backend/api/auth.py` validating token existence/expiry, resetting active user password hash, setting verified status, and revoking all active sessions.
 - Added `ResetPasswordRequest` validation schema in `backend/schemas/auth_schemas.py`.
+- Implemented `DELETE /api/auth/account` endpoint in `backend/api/auth.py` verifying authenticated email address match, updating user state to soft-deleted, revoking all active refresh tokens, erasing the browser session cookie, and dispatching a deletion confirmation email.
+- Implemented `POST /api/auth/account/cancel-deletion` endpoint in `backend/api/auth.py` permitting users within the 30-day grace period to cancel a scheduled account deletion.
+- Added `DeleteAccountRequest` validation schema in `backend/schemas/auth_schemas.py`.
+- Updated login endpoint and authentication middleware checks to allow users to log in specifically to cancel their deletion request within the 30-day grace period.
+
 
 
 

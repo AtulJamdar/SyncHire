@@ -242,12 +242,12 @@ Tasks are not vague reminders. Each task is specific enough that any engineer ca
   - Validate token, update hash, revoke all refresh tokens
   - **Ref:** `08_API.md`
 
-- [ ] Implement `DELETE /api/auth/account`
+- [✔️] Implement `DELETE /api/auth/account`
   - Confirm email matches
   - Soft-delete + revoke all sessions + send confirmation email
   - **Ref:** `08_API.md`, `03_FEATURES.md` F-AUTH-05
 
-- [ ] Write audit log calls for all auth events
+- [✔️] Write audit log calls for all auth events
   - user.registered, user.verified, user.login, user.login_failed, user.logout, user.password_reset_*, user.deletion_initiated
   - **Ref:** `13_SECURITY.md` Section 14.1
 

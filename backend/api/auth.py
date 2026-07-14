@@ -23,9 +23,10 @@ from core.redis_client import redis
 from core.security import hash_password, create_refresh_token, set_refresh_cookie, create_access_token, verify_password
 from models.user import User, UserRole
 from models.token import EmailVerificationToken, RefreshToken, PasswordResetToken
-from schemas.auth_schemas import RegisterRequest, ResendVerificationRequest, LoginRequest, ForgotPasswordRequest, ResetPasswordRequest
+from schemas.auth_schemas import RegisterRequest, ResendVerificationRequest, LoginRequest, ForgotPasswordRequest, ResetPasswordRequest, DeleteAccountRequest
 from notifications.email.client import EmailClient
 from middleware.auth_middleware import get_current_user
+from core.audit import log_audit_event
 
 logger = logging.getLogger("auth_router")
 email_client = EmailClient()
@@ -34,7 +35,11 @@ router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 
 @router.post("/register", status_code=status.HTTP_201_CREATED)
-async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
+async def register(
+    body: RegisterRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db)
+):
     # 1. Check for existing email (verified or unverified)
     result = await db.execute(select(User).where(User.email == body.email))
     existing_user = result.scalar_one_or_none()
@@ -70,6 +75,18 @@ async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
         expires_at=datetime.now(timezone.utc) + timedelta(hours=24)
     )
     db.add(token_record)
+    
+    # Log audit event
+    await log_audit_event(
+        db=db,
+        event="user.registered",
+        request=request,
+        actor_id=new_user.id,
+        target_id=new_user.id,
+        target_type="user",
+        metadata={"email": new_user.email}
+    )
+    
     await db.commit()
     
     # 4. Send verification email
@@ -99,7 +116,11 @@ async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/verify-email", status_code=status.HTTP_200_OK)
-async def verify_email(token: uuid.UUID, db: AsyncSession = Depends(get_db)):
+async def verify_email(
+    token: uuid.UUID,
+    request: Request,
+    db: AsyncSession = Depends(get_db)
+):
     # 1. Fetch verification token
     result = await db.execute(
         select(EmailVerificationToken).where(EmailVerificationToken.token == token)
@@ -146,6 +167,17 @@ async def verify_email(token: uuid.UUID, db: AsyncSession = Depends(get_db)):
         )
         
     user.is_verified = True
+    
+    # Log audit event
+    await log_audit_event(
+        db=db,
+        event="user.verified",
+        request=request,
+        actor_id=user.id,
+        target_id=user.id,
+        target_type="user",
+        metadata={"email": user.email}
+    )
     
     # 5. Clean up verification token record
     await db.delete(token_record)
@@ -286,6 +318,7 @@ async def oauth_google():
 async def oauth_google_callback(
     code: str,
     state: str,
+    request: Request,
     db: AsyncSession = Depends(get_db)
 ):
     # 1. Verify CSRF state parameter
@@ -400,13 +433,33 @@ async def oauth_google_callback(
             }
         )
 
+    # Helper function to check deactivation/deletion
+    def is_user_suspended_or_deleted(u: User) -> bool:
+        if not u.is_active:
+            return True
+        if u.is_deleted:
+            now = datetime.now(timezone.utc)
+            deleted_at = u.deleted_at
+            if deleted_at and deleted_at.tzinfo is None:
+                deleted_at = deleted_at.replace(tzinfo=timezone.utc)
+            if not deleted_at or (now - deleted_at).days >= 30:
+                return True
+        return False
+
     # 4. Create or link user account in database
     user_result = await db.execute(select(User).where(User.google_id == google_id))
     user = user_result.scalar_one_or_none()
     is_new_user = False
 
     if user:
-        if not user.is_active or user.is_deleted:
+        if is_user_suspended_or_deleted(user):
+            await log_audit_event(
+                db=db,
+                event="user.login_failed",
+                request=request,
+                metadata={"email": user.email, "reason": "ACCOUNT_SUSPENDED"}
+            )
+            await db.commit()
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Account is deactivated or deleted"
@@ -417,7 +470,14 @@ async def oauth_google_callback(
         user = email_result.scalar_one_or_none()
         
         if user:
-            if not user.is_active or user.is_deleted:
+            if is_user_suspended_or_deleted(user):
+                await log_audit_event(
+                    db=db,
+                    event="user.login_failed",
+                    request=request,
+                    metadata={"email": user.email, "reason": "ACCOUNT_SUSPENDED"}
+                )
+                await db.commit()
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail="Account is deactivated or deleted"
@@ -452,6 +512,29 @@ async def oauth_google_callback(
         expires_at=datetime.now(timezone.utc) + timedelta(days=30)
     )
     db.add(db_token)
+    
+    # Log audit event
+    if is_new_user:
+        await log_audit_event(
+            db=db,
+            event="user.registered",
+            request=request,
+            actor_id=user.id,
+            target_id=user.id,
+            target_type="user",
+            metadata={"email": user.email, "provider": "google"}
+        )
+    else:
+        await log_audit_event(
+            db=db,
+            event="user.login",
+            request=request,
+            actor_id=user.id,
+            target_id=user.id,
+            target_type="user",
+            metadata={"email": user.email, "provider": "google"}
+        )
+        
     await db.commit()
 
     # 6. Redirect to frontend with refresh token cookie
@@ -470,6 +553,7 @@ async def oauth_google_callback(
 async def login(
     body: LoginRequest,
     response: Response,
+    request: Request,
     db: AsyncSession = Depends(get_db)
 ):
     email = body.email.strip().lower()
@@ -481,6 +565,14 @@ async def login(
         if attempts_str and int(attempts_str) >= 10:
             remaining = await redis.ttl(lockout_key)
             remaining = max(1, remaining)
+            # Log failure due to lockout
+            await log_audit_event(
+                db=db,
+                event="user.login_failed",
+                request=request,
+                metadata={"email": email, "reason": "ACCOUNT_LOCKED"}
+            )
+            await db.commit()
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
                 detail={
@@ -513,6 +605,13 @@ async def login(
         except Exception as e:
             logger.error(f"Redis increment failed: {e}")
             
+        await log_audit_event(
+            db=db,
+            event="user.login_failed",
+            request=request,
+            metadata={"email": email, "reason": "INVALID_CREDENTIALS"}
+        )
+        await db.commit()
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail={
@@ -533,6 +632,13 @@ async def login(
         except Exception as e:
             logger.error(f"Redis increment failed: {e}")
             
+        await log_audit_event(
+            db=db,
+            event="user.login_failed",
+            request=request,
+            metadata={"email": email, "reason": "INVALID_CREDENTIALS"}
+        )
+        await db.commit()
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail={
@@ -549,6 +655,16 @@ async def login(
 
     # 5. Check if verified
     if not user.is_verified:
+        await log_audit_event(
+            db=db,
+            event="user.login_failed",
+            request=request,
+            actor_id=user.id,
+            target_id=user.id,
+            target_type="user",
+            metadata={"email": user.email, "reason": "ACCOUNT_NOT_VERIFIED"}
+        )
+        await db.commit()
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail={
@@ -557,8 +673,18 @@ async def login(
             }
         )
 
-    # 6. Check if active/suspended
-    if not user.is_active or user.is_deleted:
+    # 6. Check if active/suspended or deleted beyond grace period
+    if not user.is_active:
+        await log_audit_event(
+            db=db,
+            event="user.login_failed",
+            request=request,
+            actor_id=user.id,
+            target_id=user.id,
+            target_type="user",
+            metadata={"email": user.email, "reason": "ACCOUNT_SUSPENDED"}
+        )
+        await db.commit()
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail={
@@ -566,6 +692,31 @@ async def login(
                 "message": "This account has been suspended"
             }
         )
+        
+    if user.is_deleted:
+        now = datetime.now(timezone.utc)
+        deleted_at = user.deleted_at
+        if deleted_at and deleted_at.tzinfo is None:
+            deleted_at = deleted_at.replace(tzinfo=timezone.utc)
+            
+        if not deleted_at or (now - deleted_at).days >= 30:
+            await log_audit_event(
+                db=db,
+                event="user.login_failed",
+                request=request,
+                actor_id=user.id,
+                target_id=user.id,
+                target_type="user",
+                metadata={"email": user.email, "reason": "ACCOUNT_SUSPENDED"}
+            )
+            await db.commit()
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={
+                    "code": "ACCOUNT_SUSPENDED",
+                    "message": "This account has been suspended"
+                }
+            )
 
     # 7. Issue access token
     access_token = create_access_token(
@@ -581,6 +732,18 @@ async def login(
         expires_at=datetime.now(timezone.utc) + timedelta(days=30)
     )
     db.add(db_token)
+    
+    # Log successful login audit event
+    await log_audit_event(
+        db=db,
+        event="user.login",
+        request=request,
+        actor_id=user.id,
+        target_id=user.id,
+        target_type="user",
+        metadata={"email": user.email, "provider": "credentials"}
+    )
+    
     await db.commit()
 
     # 9. Return JSON payload
@@ -732,7 +895,18 @@ async def logout(
                 RefreshToken.user_id == current_user.id
             )
         )
-        await db.commit()
+
+    # Log audit event
+    await log_audit_event(
+        db=db,
+        event="user.logout",
+        request=request,
+        actor_id=current_user.id,
+        target_id=current_user.id,
+        target_type="user",
+        metadata={"email": current_user.email}
+    )
+    await db.commit()
 
     # 3. Clear cookie from client browser
     response.delete_cookie(key="refresh_token", path="/api/auth")
@@ -743,6 +917,7 @@ async def logout(
 @router.post("/forgot-password", status_code=status.HTTP_200_OK)
 async def forgot_password(
     body: ForgotPasswordRequest,
+    request: Request,
     db: AsyncSession = Depends(get_db)
 ):
     email = body.email.strip().lower()
@@ -803,6 +978,18 @@ async def forgot_password(
         expires_at=datetime.now(timezone.utc) + timedelta(hours=1)
     )
     db.add(token_record)
+    
+    # Log audit event
+    await log_audit_event(
+        db=db,
+        event="user.password_reset_requested",
+        request=request,
+        actor_id=user.id,
+        target_id=user.id,
+        target_type="user",
+        metadata={"email": user.email}
+    )
+    
     await db.commit()
 
     # 5. Send password reset email
@@ -835,6 +1022,7 @@ async def forgot_password(
 @router.post("/reset-password", status_code=status.HTTP_200_OK)
 async def reset_password(
     body: ResetPasswordRequest,
+    request: Request,
     db: AsyncSession = Depends(get_db)
 ):
     # 1. Compute SHA-256 hash of the token
@@ -896,10 +1084,188 @@ async def reset_password(
 
     # 7. Delete/Clean up the reset token
     await db.delete(record)
+    
+    # Log audit event
+    await log_audit_event(
+        db=db,
+        event="user.password_reset_completed",
+        request=request,
+        actor_id=user.id,
+        target_id=user.id,
+        target_type="user",
+        metadata={"email": user.email}
+    )
+    
     await db.commit()
 
     return {
         "message": "Password reset successfully. Please log in with your new password."
+    }
+
+
+@router.delete("/account", status_code=status.HTTP_200_OK)
+async def delete_account(
+    body: DeleteAccountRequest,
+    response: Response,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    # 1. Confirm email matches authenticated user
+    if body.confirm_email.strip().lower() != current_user.email.strip().lower():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "code": "EMAIL_MISMATCH",
+                "message": "The confirmed email does not match the authenticated user's email."
+            }
+        )
+
+    # 2. Enforce rate limit: 3 requests / day / user using Redis
+    rate_limit_key = f"rl:auth_delete_account:user:{current_user.id}"
+    now_ts = time.time()
+    window_start = now_ts - 86400  # 1 day
+    
+    try:
+        pipe = redis.pipeline()
+        pipe.zremrangebyscore(rate_limit_key, 0, window_start)
+        pipe.zadd(rate_limit_key, {str(now_ts): now_ts})
+        pipe.zcard(rate_limit_key)
+        pipe.expire(rate_limit_key, 86401)
+        results = await pipe.execute()
+        count = results[2]
+        if count > 3:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail={
+                    "code": "TOO_MANY_REQUESTS",
+                    "message": "Too many account deletion requests. Please try again tomorrow."
+                }
+            )
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        logger.error(f"Redis user rate limiting connection failed: {e}")
+
+    # 3. Soft-delete: update user state
+    now_utc = datetime.now(timezone.utc)
+    current_user.is_deleted = True
+    current_user.deleted_at = now_utc
+
+    # 4. Revoke all active sessions (delete all refresh tokens for this user)
+    await db.execute(
+        delete(RefreshToken).where(RefreshToken.user_id == current_user.id)
+    )
+    
+    # Log audit event
+    await log_audit_event(
+        db=db,
+        event="user.deletion_initiated",
+        request=request,
+        actor_id=current_user.id,
+        target_id=current_user.id,
+        target_type="user",
+        metadata={"email": current_user.email}
+    )
+    await db.commit()
+
+    # 5. Clear cookie from client browser
+    response.delete_cookie(key="refresh_token", path="/api/auth")
+
+    # 6. Calculate deletion date (30 days from now)
+    deletion_date = now_utc + timedelta(days=30)
+    deletion_date_str = deletion_date.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    # 7. Send confirmation email
+    subject = "Your account deletion has been scheduled"
+    html_body = f"""
+    <p>Hi {current_user.name},</p>
+    <p>We received a request to permanently delete your Job Finder AI account.</p>
+    <p>Your account has been scheduled for deletion and will be permanently removed on {deletion_date_str}.</p>
+    <p>If you did not request this deletion, or if you change your mind, you can cancel this request at any time within the next 30 days by logging back into your account and canceling the deletion request.</p>
+    """
+    
+    try:
+        email_sent = await email_client.send(
+            to=current_user.email,
+            subject=subject,
+            html_body=html_body,
+            from_name=settings.EMAIL_FROM_NAME,
+            from_email=settings.EMAIL_FROM_ADDRESS
+        )
+        if not email_sent:
+            logger.error(f"Failed to send account deletion confirmation email to {current_user.email}")
+    except Exception as e:
+        logger.error(f"Email service exception while sending account deletion confirmation to {current_user.email}: {e}")
+
+    return {
+        "message": "Account scheduled for deletion. You have 30 days to cancel.",
+        "deletion_date": deletion_date_str
+    }
+
+
+@router.post("/account/cancel-deletion", status_code=status.HTTP_200_OK)
+async def cancel_deletion(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    # Enforce rate limit: 5 requests / day / user using Redis
+    rate_limit_key = f"rl:auth_cancel_deletion:user:{current_user.id}"
+    now_ts = time.time()
+    window_start = now_ts - 86400  # 1 day
+    
+    try:
+        pipe = redis.pipeline()
+        pipe.zremrangebyscore(rate_limit_key, 0, window_start)
+        pipe.zadd(rate_limit_key, {str(now_ts): now_ts})
+        pipe.zcard(rate_limit_key)
+        pipe.expire(rate_limit_key, 86401)
+        results = await pipe.execute()
+        count = results[2]
+        if count > 5:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail={
+                    "code": "TOO_MANY_REQUESTS",
+                    "message": "Too many deletion cancellation requests. Please try again tomorrow."
+                }
+            )
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        logger.error(f"Redis user rate limiting connection failed: {e}")
+
+    if not current_user.is_deleted:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "code": "NO_PENDING_DELETION",
+                "message": "Account is not currently scheduled for deletion"
+            }
+        )
+
+    # Check if the grace period has already passed
+    now = datetime.now(timezone.utc)
+    deleted_at = current_user.deleted_at
+    if deleted_at and deleted_at.tzinfo is None:
+        deleted_at = deleted_at.replace(tzinfo=timezone.utc)
+
+    if deleted_at and (now - deleted_at).days >= 30:
+        raise HTTPException(
+            status_code=status.HTTP_410_GONE,
+            detail={
+                "code": "DELETION_ALREADY_PROCESSED",
+                "message": "Grace period has already passed; account permanently deleted"
+            }
+        )
+
+    # Restore the account
+    current_user.is_deleted = False
+    current_user.deleted_at = None
+    await db.commit()
+
+    return {
+        "message": "Account deletion cancelled. Welcome back!"
     }
 
 
