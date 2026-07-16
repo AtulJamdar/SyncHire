@@ -253,26 +253,26 @@ Tasks are not vague reminders. Each task is specific enough that any engineer ca
 
 ### Frontend — Auth Pages
 
-- [ ] Build `/login` page
+- [✔️] Build `/login` page
   - Email + password form with inline validation
   - "Continue with Google" button
   - Links to `/register` and `/forgot-password`
   - On success: redirect to `/jobs` (or `?redirect=` param destination)
   - **Ref:** `12_FRONTEND.md` Section 3.1
 
-- [ ] Build `/register` page
+- [✔️] Build `/register` page
   - Name, email, password, confirm password
   - Password strength indicator
   - On success: "Check your email" confirmation screen
   - **Ref:** `12_FRONTEND.md` Section 3.2
 
-- [ ] Build `/verify-email` page
+- [✔️] Build `/verify-email` page
   - Reads `?token=` from URL
   - Calls `GET /api/auth/verify-email`
   - Success state → redirect to `/onboarding/1`
   - Expired state → resend option
 
-- [ ] Build `/forgot-password` and `/reset-password` pages
+- [✔️] Build `/forgot-password` and `/reset-password` pages
 
 ### Testing — Auth
 

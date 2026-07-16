@@ -57,6 +57,22 @@ apiClient.interceptors.response.use(
 
 // Domain-grouped API wrappers
 export const api = {
+  auth: {
+    login: (email: string, password: string) =>
+      apiClient.post<{ access_token: string; token_type: string }>("/api/auth/login", { email, password }).then((r) => r.data),
+    logout: () =>
+      apiClient.post("/api/auth/logout").then((r) => r.data),
+    register: (email: string, password: string) =>
+      apiClient.post("/api/auth/register", { email, password }).then((r) => r.data),
+    verifyEmail: (token: string) =>
+      apiClient.get("/api/auth/verify-email", { params: { token } }).then((r) => r.data),
+    googleCallback: (code: string) =>
+      apiClient.post<{ access_token: string; token_type: string }>("/api/auth/oauth/google/callback", { code }).then((r) => r.data),
+    forgotPassword: (email: string) =>
+      apiClient.post("/api/auth/forgot-password", { email }).then((r) => r.data),
+    resetPassword: (token: string, password: string) =>
+      apiClient.post("/api/auth/reset-password", { token, password }).then((r) => r.data),
+  },
   jobs: {
     list: (params: JobFilters) =>
       apiClient.get<PaginatedResponse<JobListItem>>("/api/jobs", { params }).then((r) => r.data),

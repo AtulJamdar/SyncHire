@@ -83,6 +83,25 @@ Changes that are documented or planned but not yet deployed to production.
 - Created `frontend/lib/api.ts` exposing domain-grouped API functions with auto-refresh JWT interceptors.
 - Implemented core utility helpers in `frontend/lib/utils.ts` for relative timestamp formatting (`formatPostedAt`), absolute date formatting (`formatDate`), accessibility animation gating (`getMotionPreference`), and active query filter identification (`hasActiveFilters`).
 - Created `frontend/middleware.ts` for global Next.js route protection, managing auth state redirects and handling unauthenticated routes transparently.
+- Created `frontend/app/(auth)/login/page.tsx` — login page Server Component with metadata.
+- Created `frontend/components/auth/LoginForm.tsx` — Client Component login form with email/password fields, inline validation, and OAuth button.
+- Created `frontend/hooks/useLogin.ts` — React Query mutation hook wrapping `api.auth.login()` with access token management.
+- Added `auth` API methods to `frontend/lib/api.ts`: `login()`, `logout()`, `register()`, `verifyEmail()`, `googleCallback()`, `forgotPassword()`, `resetPassword()`.
+- Added TypeScript types to `frontend/types/index.ts`: `LoginRequest`, `LoginResponse`, `RegisterRequest` for auth API contracts.
+- Created `frontend/app/(auth)/register/page.tsx` — registration page Server Component with metadata.
+- Created `frontend/components/auth/RegisterForm.tsx` — Client Component registration form with name/email/password fields, inline validation, password strength indicator, and "Check your email" confirmation screen.
+- Created `frontend/hooks/useRegister.ts` — React Query mutation hook for `POST /api/auth/register` with access token storage.
+- Created `frontend/app/(auth)/forgot-password/page.tsx` — forgot password page Server Component with metadata.
+- Created `frontend/components/auth/ForgotPasswordForm.tsx` — Client Component password reset request form with email validation and generic confirmation.
+- Created `frontend/hooks/useForgotPassword.ts` — React Query mutation hook for `POST /api/auth/forgot-password`.
+- Created `frontend/app/(auth)/reset-password/page.tsx` — reset password page Server Component with metadata.
+- Created `frontend/components/auth/ResetPasswordForm.tsx` — Client Component reset password form with token handling, password validation, and confirm password matching.
+- Created `frontend/hooks/useResetPassword.ts` — React Query mutation hook for `POST /api/auth/reset-password`.
+- Created `frontend/app/(auth)/verify-email/page.tsx` — verification page Server Component with metadata.
+- Created `frontend/components/auth/VerifyEmailForm.tsx` — Client Component email verification form with token extraction from URL, loading/success/error/expired states, and automatic redirect to onboarding on success.
+- Created `frontend/hooks/useVerifyEmail.ts` — React Query mutation hook for `GET /api/auth/verify-email?token={uuid}`.
+- Fixed `frontend/lib/api.ts` — Updated `api.auth.verifyEmail()` to use GET with query parameter instead of POST.
+- Added `VerifyEmailResponse` type to `frontend/types/index.ts` for response schema.
 - Initialized Alembic database migration environment in the backend and configured script location to `database/migrations/`.
 - Created the declarative SQLAlchemy `User` model in `backend/models/user.py` representing the core identity table.
 - Created the Alembic migration script for the `users` table, including custom `user_role` PostgreSQL enum type and partial unique indexes.

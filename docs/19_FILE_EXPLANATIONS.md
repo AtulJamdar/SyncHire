@@ -588,7 +588,7 @@ class XyzAdapter(BaseScraper):
 
 | Route Group | URL Prefix | Auth Required | Shared Layout |
 |---|---|---|---|
-| `(auth)` | `/login`, `/register`, `/verify-email` | None (redirect if authed) | Minimal centered layout |
+| `(auth)` | `/login`, `/register`, `/forgot-password`, `/reset-password`, `/verify-email` | None (redirect if authed) | Minimal centered layout |
 | `(onboarding)` | `/onboarding/1–4` | Required | Progress step indicator |
 | `(dashboard)` | `/jobs`, `/my-jobs`, `/settings` | Required | Navbar + sidebar |
 | `(admin)` | `/admin/*` | Admin role | Admin sidebar nav |
@@ -624,6 +624,7 @@ class XyzAdapter(BaseScraper):
 | Subfolder | Contains |
 |---|---|
 | `ui/` | shadcn/ui primitives — Button, Badge, Card, Dialog, Input, Select, Tabs, Skeleton, Sheet, Toast. **Copied in and fully owned by us — not an npm dependency.** |
+| `auth/` | LoginForm, RegisterForm (Phase 1). Client Components with form state, validation, submission, password strength indicator, and auth-specific state management. |
 | `jobs/` | JobCard, JobFeed, FilterBar, JobDetail, SkillMatchChips, PostedLabel, EmptyFeed, FeedSkeleton |
 | `onboarding/` | StepIndicator, SkillPicker, RolePicker, LocationPicker, TelegramConnect |
 | `my-jobs/` | JobPipeline, SavedJobRow, StatsBar |
@@ -651,6 +652,9 @@ class XyzAdapter(BaseScraper):
 
 | File | Wraps |
 |---|---|
+| `useLogin.ts` | `useMutation` for `POST /api/auth/login` — stores access token in memory on success |
+| `useRegister.ts` | `useMutation` for `POST /api/auth/register` — stores access token in memory on success, returns null email on POST /api/auth/register endpoint (due to user_email field returning null for newly registered users) |
+| `useVerifyEmail.ts` | `useMutation` for `GET /api/auth/verify-email?token={uuid}` — verifies email token and returns message on success |
 | `useJobs.ts` | `useInfiniteQuery` for the paginated jobs feed |
 | `useSavedJobs.ts` | `useQuery` for saved jobs list + `useMutation` for save/unsave/update status |
 | `useProfile.ts` | `useQuery` for profile + `useMutation` for skills/preferences updates |

@@ -99,6 +99,10 @@ frontend/
 │   │   │   └── page.tsx
 │   │   ├── register/
 │   │   │   └── page.tsx
+│   │   ├── forgot-password/
+│   │   │   └── page.tsx
+│   │   ├── reset-password/
+│   │   │   └── page.tsx
 │   │   └── verify-email/
 │   │       └── page.tsx
 │   │
@@ -263,6 +267,19 @@ export default function LoginPage() {
 - "Continue with Google" OAuth button
 - Link to `/login`
 - On success: "Check your email" confirmation screen replaces the form
+
+---
+
+### `/forgot-password` and `/reset-password` — Password Reset Flow
+
+**Auth:** Redirects to `/jobs` if already authenticated
+
+**What it contains:**
+- Email input for requesting a reset link
+- Generic success confirmation screen for email enumeration protection
+- Reset form with token extracted from `?token=` URL param
+- Client-side password validation and confirm password matching
+- Token expiry and invalid link states with guidance to request a new reset link
 
 ---
 

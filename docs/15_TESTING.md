@@ -272,7 +272,7 @@ Tasks are not vague reminders. Each task is specific enough that any engineer ca
   - Success state → redirect to `/onboarding/1`
   - Expired state → resend option
 
-- [ ] Build `/forgot-password` and `/reset-password` pages
+- [✔️] Build `/forgot-password` and `/reset-password` pages
 
 ### Testing — Auth
 
