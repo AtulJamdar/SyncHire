@@ -28,4 +28,3 @@ Run your backend/frontend as described in the relevant documentation files.
 
 See [LICENSE](LICENSE).
 
-<!-- sdfs -->
